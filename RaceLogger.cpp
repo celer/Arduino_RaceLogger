@@ -16,7 +16,7 @@
 // turn off output
 #define PMTK_SET_NMEA_OUTPUT_OFF "$PMTK314,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*28"
 
-#define LOG_LED_PIN 5
+#define LOG_LED_PIN 4
 
 uint8_t * heapptr, * stackptr;
 void check_mem() {
@@ -30,7 +30,8 @@ void check_mem() {
 RaceLogger::RaceLogger(){
   gpsStream=NULL;
   accel=NULL;
-  
+  //FIXME this could be figured out if we aren't moving and can make some reasonable assumptions
+  ignPerRev=2;
   running=false;
   haveSDCard=false;
   haveGPSFix=false;
@@ -61,9 +62,19 @@ void RaceLogger::initAccel(){
     DEBUG("No Accel Connected");
   }
 }
+  
+volatile uint16_t ignCount=0;
+uint32_t ignLastCalc=0;
+void ignInterrupt(){
+  ignCount++; 
+}
+
+
+void RaceLogger::setRPMInterrupt(uint8_t intNumber){
+  attachInterrupt(intNumber,ignInterrupt,RISING);
+}
 
 void RaceLogger::init(){
-  pinMode(53,OUTPUT);
 #ifdef LOG_LED_PIN
   pinMode(LOG_LED_PIN,OUTPUT);
 #endif
@@ -82,9 +93,11 @@ void RaceLogger::init(){
 
 
 void RaceLogger::openLog(){
+  delay(500);
+  pinMode(53,OUTPUT);
   haveSDCard=false;
   int j=0;
-  for(j=0;j<=3;j++){
+  for(j=3;j<=3;j++){
     Serial.print("Using card speed: ");
     Serial.println(j);
     if(sdCard.init(j,SD_CHIP_SELECT)>0){
@@ -206,6 +219,22 @@ void RaceLogger::loop(){
 
   if(running){
     if(haveSDCard){
+      uint32_t now = millis();
+      if(now-ignLastCalc > 100){
+        if(ignCount>0){
+          float rpm = (((ignCount)/(float) (now-ignLastCalc))*1000)/ignPerRev;
+       
+          Serial.print("RPM");
+          Serial.println(rpm);
+
+          noInterrupts();
+          ignCount=0;
+          ignLastCalc=now;
+          interrupts();
+        } else {
+          ignLastCalc=now;
+        }
+      } 
       //Log the accelerometer data
       if(accel && accel->available()){
         accel->read();
