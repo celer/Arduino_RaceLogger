@@ -24,6 +24,8 @@ public:
   void initGPS();
   void initAccel();
 
+  void setRPMInterrupt(uint8_t intNumber);
+  
   void setGPSSerial(Stream *gpsStream){
     this->gpsStream = gpsStream;
   }
@@ -62,6 +64,7 @@ public:
   SdVolume sdVolume;
   SdFile logFile;
 
+  uint8_t ignPerRev;
   uint32_t gpsLinesCaptured;
   uint32_t accelLinesCaptured;
   uint32_t idleCount;
